@@ -1,3 +1,5 @@
+D:\prog\period-tracker\.idea
+
 # Logs
 logs
 *.log
@@ -22,6 +24,5 @@ dist-ssr
 *.sln
 *.sw?
 
-.idea
 .env
 plan
