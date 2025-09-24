@@ -100,7 +100,13 @@ export default function App() {
 
   return (
     <div className="calendar-wrapper">
-        <img src="src/assets/periodt-logo.svg" alt="Periodt." height="36"  className="brand-logo" />
+        <img
+            src="src/assets/periodt-logo.svg"
+            alt="Periodt."
+            height="36"
+            className="brand-logo"
+            style={{ display: "block", marginInline: "auto" }}
+        />
       <header className="cal-header">
         <button className="nav" onClick={prev} aria-label="Previous month">‹</button>
         <div className="title" aria-live="polite">{monthLabel}</div>
