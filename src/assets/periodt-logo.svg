@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="200" viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="200" fill="none"/>
+  <g font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-weight="700">
+    <text x="24" y="132" font-size="120" fill="#E6E8EB" letter-spacing="1">
+      <tspan>Periodt</tspan><tspan fill="#DC2626">.</tspan>
+    </text>
+  </g>
+</svg>
