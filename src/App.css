@@ -62,6 +62,30 @@ body{ background:var(--bg); color:var(--text); font-family:system-ui,-apple-syst
 .brand-logo{ height:36px; }
 .brand-title{ font-size:1.25rem; margin:0; }
 
+.field-error {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: #fca5a5; /* soft red */
+}
+input[aria-invalid="true"] {
+  border-color: #7f1d1d; /* subtle red border when invalid */
+}
+
+/* Remove number input arrows (Chrome, Edge, Safari, Opera) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Remove in Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+
+
 
 
 @media (max-width: 560px){ :root{ --cell:78px; } }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import "./App.css";
 
 // ---- Utilities ----
@@ -11,14 +11,12 @@ const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); ret
 const addMonths = (d, n) => new Date(d.getFullYear(), d.getMonth()+n, 1);
 
 function monthGrid(viewMonth) {
-  // Returns 42 Date objects covering the 6x7 calendar for the month
   const first = startOfMonth(viewMonth);
   const startOffset = (first.getDay() - WEEK_START + 7) % 7;
   const gridStart = addDays(first, -startOffset);
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
 
-// Predict next N periods from lastStart (inclusive), each lasting periodLength days
 function predictPeriods(lastStartISO, cycleLength, periodLength, count = 3) {
   if (!lastStartISO || !cycleLength || !periodLength) return [];
   const [y,m,dd] = lastStartISO.split("-").map(Number);
@@ -52,34 +50,45 @@ export default function App() {
 
   // Tracked settings
   const [cycleLength, setCycleLength] = useLocalStorage("pt.cycleLength", 28);
-  const [periodLength, setPeriodLength] = useLocalStorage("pt.periodLength", 5);
+
+  // Empty-able period length UX
+  const [periodLengthInput, setPeriodLengthInput] = useLocalStorage("pt.periodLengthInput", "5");
+  const periodLength = useMemo(() => {
+    const n = parseInt(periodLengthInput, 10);
+    return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null;
+  }, [periodLengthInput]);
+  const periodLengthError =
+    periodLengthInput === "" ? "Period length is required"
+    : (periodLength === null ? "Enter a number 1–10" : "");
+
   const [lastStartISO, setLastStartISO] = useLocalStorage("pt.lastStartISO", toISO(today));
 
-  // Marked period days (past/actual selections)
-  const [markedDays, setMarkedDays] = useLocalStorage("pt.markedDays", []); // array of ISO strings
+  // Marked period days
+  const [markedDays, setMarkedDays] = useLocalStorage("pt.markedDays", []);
   const markedSet = useMemo(() => new Set(markedDays), [markedDays]);
 
-  // Predicted upcoming days
-  const predictions = useMemo(
-    () => predictPeriods(lastStartISO, Number(cycleLength), Number(periodLength), 4),
-    [lastStartISO, cycleLength, periodLength]
-  );
+  // Predictions
+  const predictions = useMemo(() => {
+    if (periodLength === null) return [];
+    return predictPeriods(lastStartISO, Number(cycleLength), periodLength, 4);
+  }, [lastStartISO, cycleLength, periodLength]);
   const predictedSet = useMemo(() => new Set(predictions.flatMap(p=>p.days)), [predictions]);
 
   const grid = useMemo(() => monthGrid(viewMonth), [viewMonth]);
-  const monthLabel = useMemo(() =>
-    new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(viewMonth),
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(viewMonth),
     [viewMonth]
   );
   const weekdayFmt = useMemo(() => new Intl.DateTimeFormat(undefined, { weekday: "short" }), []);
   const baseForNames = useMemo(() => new Date(2021,0,3 + WEEK_START), []);
   const dayNames = useMemo(() => Array.from({length:7}, (_,i)=> weekdayFmt.format(addDays(baseForNames,i))), [weekdayFmt, baseForNames]);
 
-  // Actions
+  // Nav
   const prev = () => setViewMonth(m => addMonths(m, -1));
   const next = () => setViewMonth(m => addMonths(m, +1));
   const jumpToday = () => setViewMonth(startOfMonth(today));
 
+  // Toggle mark
   const toggleDay = (d) => {
     const iso = toISO(d);
     const next = new Set(markedSet);
@@ -87,26 +96,59 @@ export default function App() {
     setMarkedDays(Array.from(next).sort());
   };
 
+  // Start today
   const startToday = () => {
+    if (periodLength === null) return;
     const iso = toISO(today);
     setLastStartISO(iso);
-    // Optionally pre-mark the next `periodLength` days from today
     const next = new Set(markedSet);
-    for (let i=0; i<Number(periodLength); i++) next.add(toISO(addDays(today,i)));
+    for (let i = 0; i < periodLength; i++) next.add(toISO(addDays(today, i)));
     setMarkedDays(Array.from(next).sort());
   };
 
   const clearAll = () => { setMarkedDays([]); };
 
+  // ---- MOVE THESE INSIDE THE COMPONENT ----
+
+  // Extend or trim ONLY the current cycle window based on delta
+  const adjustMarksDelta = (newLen, prevLen) => {
+    const start = new Date(lastStartISO);
+
+    if (newLen > prevLen) {
+      const toAdd = Array.from(
+        { length: newLen - prevLen },
+        (_, i) => toISO(addDays(start, prevLen + i))
+      );
+      setMarkedDays(prev => Array.from(new Set([...prev, ...toAdd])).sort());
+    } else if (newLen < prevLen) {
+      const toRemove = new Set(
+        Array.from({ length: prevLen - newLen },
+          (_, i) => toISO(addDays(start, newLen + i))
+        )
+      );
+      setMarkedDays(prev => prev.filter(iso => !toRemove.has(iso)));
+    }
+  };
+
+  // Remember last valid period length
+  const prevValidPeriodLenRef = useRef(periodLength ?? undefined);
+  useEffect(() => {
+    if (periodLength !== null) prevValidPeriodLenRef.current = periodLength;
+  }, [periodLength]);
+
+  // -----------------------------------------
+
   return (
     <div className="calendar-wrapper">
-        <img
-            src="src/assets/periodt-logo.svg"
-            alt="Periodt."
-            height="36"
-            className="brand-logo"
-            style={{ display: "block", marginInline: "auto" }}
-        />
+      {/* Use public asset path or import */}
+      <img
+        src="/periodt-logo.svg"
+        alt="Periodt."
+        height="36"
+        className="brand-logo"
+        style={{ display: "block", marginInline: "auto" }}
+      />
+
       <header className="cal-header">
         <button className="nav" onClick={prev} aria-label="Previous month">‹</button>
         <div className="title" aria-live="polite">{monthLabel}</div>
@@ -117,20 +159,59 @@ export default function App() {
       <section className="controls">
         <label>
           Cycle length (days)
-          <input type="number" min={20} max={60} value={cycleLength}
-                 onChange={e=>setCycleLength(Number(e.target.value)||28)} />
+          <input
+            type="number"
+            min={20}
+            max={60}
+            value={cycleLength}
+            onChange={e=>setCycleLength(Number(e.target.value)||28)}
+          />
         </label>
+
         <label>
           Period length (days)
-          <input type="number" min={1} max={10} value={periodLength}
-                 onChange={e=>setPeriodLength(Number(e.target.value)||5)} />
+          <input
+            type="number"
+            min={1}
+            max={10}
+            placeholder="e.g. 5"
+            value={periodLengthInput}
+            onChange={(e) => {
+              const v = e.target.value;   // allow ""
+              setPeriodLengthInput(v);
+
+              const n = parseInt(v, 10);
+              if (Number.isFinite(n) && n >= 1 && n <= 10) {
+                const prev = prevValidPeriodLenRef.current ?? 0;
+                adjustMarksDelta(n, prev);
+                prevValidPeriodLenRef.current = n;
+              }
+            }}
+            aria-invalid={periodLength === null}
+          />
+          {periodLength === null && (
+            <div className="field-error">⚠ Period length is required (1–10)</div>
+          )}
         </label>
+
         <label>
           Last period start
-          <input type="date" value={lastStartISO}
-                 onChange={e=>setLastStartISO(e.target.value)} />
+          <input
+            type="date"
+            value={lastStartISO}
+            onChange={e=>setLastStartISO(e.target.value)}
+          />
         </label>
-        <button className="primary" onClick={startToday}>Start today</button>
+
+        <button
+          className="primary"
+          onClick={startToday}
+          disabled={periodLength === null}
+          title={periodLength === null ? "Set period length (1–10)" : undefined}
+        >
+          Start today
+        </button>
+
         <button className="ghost" onClick={clearAll}>Clear marked days</button>
       </section>
 
@@ -146,14 +227,11 @@ export default function App() {
           const isToday = sameDay(d, today);
           const iso = toISO(d);
           const isMarked = markedSet.has(iso);
-          const isPred = predictedSet.has(iso);
+          const isPred = periodLength !== null && predictedSet.has(iso);
           return (
             <button
               key={i}
-              className={
-                `day ${isOther?"is-other":""} ${isToday?"is-today":""} ` +
-                `${isMarked?"is-marked":""} ${isPred?"is-pred":""}`
-              }
+              className={`day ${isOther?"is-other":""} ${isToday?"is-today":""} ${isMarked?"is-marked":""} ${isPred?"is-pred":""}`}
               onClick={() => toggleDay(d)}
               title={iso}
             >
@@ -174,7 +252,7 @@ export default function App() {
           <h3>Upcoming cycles</h3>
           <ul>
             {predictions.map((p,idx)=> (
-              <li key={idx}>Cycle {idx+1}: starts <strong>{p.start}</strong> ({periodLength} days)</li>
+              <li key={idx}>Cycle {idx+1}: starts <strong>{p.start}</strong> ({periodLength ?? "?"} days)</li>
             ))}
           </ul>
         </section>
