@@ -19,16 +19,20 @@ function monthGrid(viewMonth) {
 
 function predictPeriods(lastStartISO, cycleLength, periodLength, count = 3) {
   if (!lastStartISO || !cycleLength || !periodLength) return [];
-  const [y,m,dd] = lastStartISO.split("-").map(Number);
-  const lastStart = new Date(y, m-1, dd);
+  const lastStart = parseISO(lastStartISO);
   const preds = [];
-  for (let i=1; i<=count; i++) {
-    const start = addDays(lastStart, i*cycleLength);
-    const days = Array.from({length: periodLength}, (_,k)=> toISO(addDays(start,k)));
+  for (let i = 1; i <= count; i++) {
+    const start = addDays(lastStart, i * cycleLength);
+    const days = Array.from({ length: periodLength }, (_, k) => toISO(addDays(start, k)));
     preds.push({ start: toISO(start), days });
   }
   return preds;
 }
+
+const parseISO = (iso) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
 
 // LocalStorage hook
 function useLocalStorage(key, initialValue) {
@@ -112,7 +116,8 @@ export default function App() {
 
   // Extend or trim ONLY the current cycle window based on delta
   const adjustMarksDelta = (newLen, prevLen) => {
-    const start = new Date(lastStartISO);
+    if (!lastStartISO) return;
+    const start = parseISO(lastStartISO);
 
     if (newLen > prevLen) {
       const toAdd = Array.from(
