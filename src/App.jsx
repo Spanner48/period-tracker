@@ -34,6 +34,17 @@ const parseISO = (iso) => {
   return new Date(y, m - 1, d);
 };
 
+// First day of the most recent run of consecutive marked days
+function latestPeriodStart(markedISOs) {
+  if (markedISOs.length === 0) return null;
+  const set = new Set(markedISOs);
+  let start = [...markedISOs].sort().at(-1);
+  while (set.has(toISO(addDays(parseISO(start), -1)))) {
+    start = toISO(addDays(parseISO(start), -1));
+  }
+  return start;
+}
+
 // LocalStorage hook
 function useLocalStorage(key, initialValue) {
   const [value, setValue] = useState(() => {
@@ -93,12 +104,16 @@ export default function App() {
   const jumpToday = () => setViewMonth(startOfMonth(today));
 
   // Toggle mark
-  const toggleDay = (d) => {
-    const iso = toISO(d);
-    const next = new Set(markedSet);
-    if (next.has(iso)) next.delete(iso); else next.add(iso);
-    setMarkedDays(Array.from(next).sort());
-  };
+ const toggleDay = (d) => {
+   const iso = toISO(d);
+   const next = new Set(markedSet);
+   if (next.has(iso)) next.delete(iso); else next.add(iso);
+   const sorted = Array.from(next).sort();
+   setMarkedDays(sorted);
+
+   const start = latestPeriodStart(sorted);
+   if (start) setLastStartISO(start);
+};
 
   // Start today
   const startToday = () => {
